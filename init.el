@@ -5,16 +5,21 @@
 ;; Dependencies:
 
 ;; Emacs > 24.
+
+;; important installed packages:
+;; eglot
+;; use-package
+;; format-all
+;; no-littering
 ;; markdown-mode
 ;; multiple-cursors
-;; browse-kill-ring
-;; highlight-symbol
-;; wrap-region-mode
-;; elpy
-;; rust-mode
+
+;; ...and more. see package-selected-packages within custom-set-variables.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Problems to solve:
+
+;; deploy use-package everywhere. It will be in v29 anyway.
 
 ;; forward-sexp and mark-sexp to work better with Python: next-(), next-,
 ;; tree-sitter?
@@ -770,13 +775,6 @@ ready to be modified. Essentially does [M-% M-n C-m M-p]."
 ;; this is interesting, and maybe works well enough.
 (global-set-key (kbd "M-9") 'mark-sexp)
 
-;; trying this:
-;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=13642
-;; I think elpy-module-sane-defaults does this also.
-(add-hook 'python-mode-hook
-        (lambda () (setq forward-sexp-function nil)
-          ))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; grep and occur
 
@@ -1053,8 +1051,11 @@ the special version."
 (add-to-list 'auto-mode-alist '("\\(CHANGES\\|TODO\\|README\\)" . text-mode))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Coding major modes
+;; Prog-modes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; navigation
 
 ;; FIXME: tree-sitter should eventually make true AST navigation and editing
 ;; possible.
@@ -1072,6 +1073,21 @@ the special version."
     ;; this doesn't work, due to the way global-visual-line-mode overrides.
     ;; (local-set-key (kbd "C-k") 'kill-line)
 ))
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; company
+
+(use-package company
+  :ensure
+
+  :bind (:map prog-mode-map
+              ("M-TAB" . company-complete)
+              )
+
+  :config
+  ;; disable auto popups
+  (setq company-idle-delay nil)
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1098,10 +1114,6 @@ the special version."
   (eglot-ensure)
 
   (company-mode 1)
-  ;; this disables auto popups
-  (setq company-idle-delay nil)
-  ;; have to ask for it:
-  (local-set-key (kbd "M-TAB") 'company-complete)
 )
 
 (defun eglot-off ()
@@ -1117,6 +1129,28 @@ the special version."
 (add-hook 'c-initialization-hook 'eglot-on)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; formatting
+
+(use-package format-all
+  :ensure
+
+  :bind (:map prog-mode-map
+              ("C-c f" . format-all-buffer)
+              )
+
+  :config
+  ;; (setq format-all-formatters '(("Python" . black)))
+  (add-hook 'prog-mode-hook 'format-all-ensure-formatter)
+  )
+
+;; used in python especially
+(use-package highlight-indentation
+  :ensure
+  :config
+  (add-hook 'prog-mode-hook #'highlight-indentation-mode)
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Python
 
 (add-hook 'python-mode-hook (lambda ()
@@ -1129,68 +1163,11 @@ the special version."
  (set-face-attribute 'font-lock-variable-name-face nil
                      :foreground nil
                      )
+
+ ;; trying this:
+ ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=13642
+ (setq forward-sexp-function nil)
  ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; elpy-mode
-
-;; Mostly I only want this because of the jedi backend, which makes M-. work.
-;; it's possibel that I don't need "elpy" at all, just jedi / eglot.
-
-;; there's a pattern here: rustic was way too intrusive, actually doesn't
-;; provide anything on its own. elpy similarly is just a collection of
-;; potentially useful packages, which you can use independently.
-
-;; NOTE: in the future, beware these "one-mode to rule them all" lang-specific
-;; bundles. Keep with the humble stuff that actually does something.
-
-;; elpy and jedi can be fussy. I had to downgrade jedi to 0.17 in the elpy venv:
-;; ~/.emacs.d/elpy/rpc-venv/
-;; I also had to call jedi:install-server and jedi:setup, but I think only once.
-;; https://github.com/jorgenschaefer/elpy/issues/1875#issuecomment-755040009
-
-;; NOTE:
-;; C-c f (elpy-format-code)
-;; customize yapf with .style.yapf in parent dir.
-;; https://github.com/google/yapf#formatting-style
-
-;; question is, can I get M-. to work without all this other crap. elpy is a bit
-;; heavy-handed. But finicky to set up these things yourself.
-
-(require 'elpy)
-
-;; I believe this adds (elpy-mode) to the python-mode-hook.
-;; Note this means it will override previously set variables in every Python
-;; buffer, so it's important to add its config to the elpy-mode-hook rather
-;; than the python-mode-hook:
-;; (elpy-enable)
-
-;; disable flymake-mode
-;; NOTE: eval elpy-modules to see what's enabled
-(setq elpy-modules (delq 'elpy-module-flymake elpy-modules))
-
-;; do I need?
-;; (elpy-rpc-restart)
-
-(add-hook 'elpy-mode-hook (lambda ()
- (setq elpy-rpc-timeout 3)
-
- ;; off by default
- ;; Popups are so un-emacs. I prefer M-/
- ;; But still can invoke via M-TAB
- (setq company-idle-delay nil)
-
- (setq flymake-no-changes-timeout 4)
-
- ;; convenience:
- (define-key elpy-mode-map (kbd "C-c f") 'elpy-format-code)
-
- ;; unbind from elpy-test, so I can use it in Python macros:
- (define-key elpy-mode-map (kbd "C-c C-t") nil)
-))
-
-;; is this necessary to call for every python file?
-;; (add-hook 'python-mode-hook 'jedi:setup)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Python macros
@@ -1472,8 +1449,9 @@ def WriteFile(filename: str, output: str):
 
 ;; xterm-color
 ;; https://github.com/atomontage/xterm-color
+(use-package xterm-color :ensure)
 
-;; Also set TERM accordingly (xterm-256color) in the shell itself.
+;; Must also set TERM=xterm-256color in the shell itself.
 (setq comint-output-filter-functions
       (remove 'ansi-color-process-output comint-output-filter-functions))
 
@@ -1585,7 +1563,7 @@ acts like M-x compile."
  '(custom-safe-themes
    '("bbaf656e55d463eddf9534d6874ad8f833f53ed1016429fab35fd907f2cd5281" default))
  '(package-selected-packages
-   '(no-littering eglot smex rust-mode solarized-theme avy jedi wrap-region highlight-symbol use-package elpy go-mode js2-mode browse-kill-ring multiple-cursors markdown-mode))
+   '(xterm-color format-all no-littering eglot smex rust-mode solarized-theme avy wrap-region highlight-symbol use-package go-mode js2-mode browse-kill-ring multiple-cursors markdown-mode))
  '(warning-suppress-types '((server))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

@@ -1129,6 +1129,14 @@ the special version."
 (add-hook 'c-initialization-hook 'eglot-on)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; eldoc
+
+;; eldoc gets enabled by eglot.
+
+;; set max size of eldoc function echoes in minibuffer.
+(setq eldoc-echo-area-use-multiline-p 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; formatting
 
 (use-package format-all
